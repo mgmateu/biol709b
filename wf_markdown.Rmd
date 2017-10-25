@@ -1,0 +1,93 @@
+#First steps of the work flow
+
+###Work done so far
+
+I tried to join the pair end reads but found that the reverse and forward were not aligning in the Argentina dataset.
+
+So I ran the QIIME codes separately for each read and used R to analyze the resulting communities.
+
+###QIIME workflow
+* Join pair end reads (forward and reverse)
+* Transform file format to fastaq
+* Add mapping file
+* Split libraries
+* Assign taxonomy
+
+###Results for R analysis of F and R reads for the Argentina dataset
+
+```{r , warning=FALSE, message=FALSE}
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+
+fdata<-import_biom('/Users/Martina/Desktop/MGM_OTUpick_forward/otu_table_mc2_metadata_wtax.biom')
+rdata<-import_biom('/Users/Martina/Desktop/MGM_OTUpick_reverse/otu_table_mc2_metadata_wtax.biom')
+```
+
+Make PCoA ordination to compare results using phyloseq package
+
+```{r}
+fdata_pcoa<-ordinate(physeq=fdata, method="PCoA", distance="bray")
+rdata_pcoa<-ordinate(physeq=rdata, method="PCoA", distance="bray")
+```
+
+PCoA for forward read
+
+```{r pcoa, echo=FALSE}
+pcoa=plot_ordination(physeq=fdata, ordination=fdata_pcoa, color="Area", shape="Plant.type")
+
+plot(pcoa)
+```
+
+PCoA for reverse read
+
+```{r pcoar, echo=FALSE}
+pcoar=plot_ordination(physeq=rdata, ordination=rdata_pcoa, color="Area", shape="Plant.type")
+
+plot(pcoar)
+```
+
+Change column names from ranks to taxonomic level
+
+```{r}
+colnames(tax_table(fdata))<-c("Kingdom", "Phylum", "Class", 
+"Order", "Family", "Genus","Species")
+colnames(tax_table(rdata))<-c("Kingdom", "Phylum", "Class", 
+"Order", "Family", "Genus","Species")
+```
+
+Filter rare reads and compare phylum level OTUs for forward and reverse reads. 
+
+```{r}
+f_phylum <- fdata %>%
+tax_glom(taxrank = "Phylum") %>%      
+transform_sample_counts(function(x) {x/sum(x)} ) %>% 
+psmelt() %>%      
+filter(Abundance > 0.02) %>%     
+arrange(Phylum)	
+
+r_phylum <- rdata %>%
+tax_glom(taxrank = "Phylum") %>%      
+transform_sample_counts(function(x) {x/sum(x)} ) %>% 
+psmelt() %>%      
+filter(Abundance > 0.02) %>%     
+arrange(Phylum)	
+```
+
+Phylum relative abundance bar graph for forward read
+
+```{r phylum.f, echo=FALSE}
+
+phylum.f=ggplot(f_phylum, aes(x = Area, y = Abundance, fill = Phylum)) + geom_bar(stat = "identity")+theme_light()
+plot(phylum.f)
+```
+
+Phylum relative abundance bar graph for reverse read
+
+```{r phylum.r, echo=FALSE}
+phylum.r=ggplot(r_phylum, aes(x = Area, y = Abundance, fill = Phylum)) + geom_bar(stat = "identity")+theme_light()
+plot(phylum.r)
+```
+
+##Next steps
+Now that I know that the reads are giving me similar communities, I will choose either the forward or reverse read for Argentina and the Maryland datasets, and then combine them to continue the community analysis in R.
