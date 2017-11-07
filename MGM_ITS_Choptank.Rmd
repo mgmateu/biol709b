@@ -1,0 +1,128 @@
+---
+title: "Fungal colonization of *Phragmites australis*"
+output: html_document
+---
+
+#Outline of my new project
+
+* I am looking at fungal endophyte colonization in native and invasive *Phragmites australis* in a freshwater tidal wetland 
+* I collected root and soil samples from 3 sites along the Choptank River that differ in salinity (but are still considered freshwater). Each site has contiguous stands of the two lineages that look like those shown on Figure 1. Samples were collected every 2 weeks throughout the growing season. The salinity gradient from less to more saline corresponds to Sites: B,F and G.
+* The roots were processed to obtain a %colonization value using microscopy, and also for molecular analysis to study the fungal endophyte communities based on the ITS gene.
+* Some of my research questions are:
+    + Are native and invasive Phragmites colonized by different fungal endophytes? Are richness and diversity indices different between the lineages, and do they differ between sites?
+    + Does root colonization differ over the growing season or by lineage? 
+    + Is fungal colonization related to salinity or hydrology?
+    + Does root morphology relate to fungal colonization?
+
+![Figure 1: Native stand of Phragmites on the left, and invasive stand on the right](/Users/Martina/Desktop/IMG_4505.jpg)
+
+###First steps of the work flow:QIIME
+Just as in my previous project the first step is getting from sequences to an OTU table using the QIIME pipeline.
+
+* Join pair end reads (forward and reverse)
+* Transform file format to fastaq
+* Add mapping file
+* Split libraries
+* Assign taxonomy
+
+Once I got an OTU table, I combined it with the taxonomy information and with my metadata in QIIME to create a phyloseq object and continue the analysis in R using the Phyloseq package.
+
+Here's the work I've done in R so far:
+
+##Now in R 
+
+###Community analysis
+
+```{r, warning=FALSE, message=FALSE}
+
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+library(vegan)
+
+its<-import_biom('/Users/Martina/Desktop/BIOL709B class/Project_ITS/OTU_biom_ITS/otu_table_mcw_w_metadata_and_tax.biom')
+
+colnames(tax_table(its))<-c("Kingdom", "Phylum", "Class", 
+
+"Order", "Family", "Genus","Species")
+```
+
+I rarefied the data and checked multivariate homogeneity of group dispersions.
+```{r, warning=FALSE, message=FALSE}
+ its_rare = rarefy_even_depth(its, rngseed=TRUE)
+
+#Calculate Bray Curtis distance matrix
+its_rare_bray <- phyloseq::distance(its_rare, method = "bray")
+#Make a data frame from the sample data
+sampledf_its <- data.frame(sample_data(its_rare))
+#Adonis test to look for differences in fungal comunities by Lineage and Site
+adonis(its_rare_bray ~ Site*Lineage, data = sampledf_its)
+
+#Homogeneity test using betadisper on rarefied data
+beta <- betadisper(its_rare_bray, sampledf_its$Site)
+permutest(beta)
+
+```
+
+
+I selected the top 5 orders that to looked at the relative abundance. I chose to looko at the Order level because the fungal ITS gene I looked at has little taxonomic information at lower levels. Even when looking at the main 5 Orders the Unidentified is a big part of it.
+
+```{r, warning=FALSE, message=FALSE}
+top.order = sort(tapply(taxa_sums(its_rare), tax_table(its_rare)[, "Order"], sum), TRUE)
+top.order = top.order[1:5]
+its_order = subset_taxa(its_rare, Order %in% names(top.order))
+get_taxa_unique(its_order, "Order")
+
+plot_bar(its_order, "Lineage", fill="Order", facet_grid=~Site)+theme_light()
+
+#NMDS ordination
+plot_ordination(its_rare, ordinate(its_rare, "NMDS", distance='bray'), color = "Site", shape="Lineage") + geom_point(size = 3)
+```
+
+###Salinity and dark septate endophyte (DSE) colonization of Phragmites
+
+```{r, warning=FALSE, message=FALSE}
+sal.dse=read.csv('/Users/Martina/Desktop/Projects/Summer 2017 /DSE col/Salinity corr/Salinity_DSE.csv')
+
+#Arrange date format
+date.dse<-as.Date(sal.dse$Date,format="%m/%d/%y")
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#Statistical analysis of salinity and colonization data using ANOVA and Tukey test
+TukeyHSD(aov(sal.dse$Percent.Colonization ~ sal.dse$Site + sal.dse$Lineage + sal.dse$Lineage*sal.dse$Site))
+
+#Summarize data to get error bars
+library(plyr)
+library(ggplot2)
+datasumm<-ddply(sal.dse,c("Lineage","Site"),summarise, meancol=mean(Percent.Colonization),
+sd=sd(Percent.Colonization),n=sum(!is.na(Percent.Colonization)), se=sd/sqrt(n))
+
+#Graph % colonization by Site
+ggplot(data=datasumm, aes(x=Site, y=meancol, fill=Lineage))+geom_bar(stat='identity',position='dodge')+scale_fill_manual(values=c("#CC6666", "#9999CC"))+geom_errorbar(aes(ymin=meancol-se, ymax=meancol+se), position=position_dodge(0.9), width=.2)+theme_light()+ylab('% DSE Colonization')
+
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#See if colonization correlates with salinity
+sal.corr.lineage<-ggplot(sal.dse,aes(x=sal.dse$Salinity, y=sal.dse$Percent.Colonization, 
+colour=Lineage))+geom_point()+geom_smooth(method='lm')
+
+sal.corr.lineage+theme_light()+labs(title='Salinity and %DSE Colonization', 
+x='Salinity (ppt)', y='%DSE Colonization')+scale_colour_manual(values=c("#CC6666", "#9999CC", "#66CC99"))
+```
+
+##Next steps
+* Figure out how to calculate correlation coeffcients separately for each line and add them to the graph (...or I may just photoshop them on there)
+* Analyze root morphology data using ANOVA to see if it affects fungal colonization
+* Try to make a phylogentic tree to see how the endophytes associated with each lineage relate to each other
+* See if hydrology influences colonization using the %colonization data and hydrology data from water level loggers that were placed at each site
+
+
+
+
+
+
+
