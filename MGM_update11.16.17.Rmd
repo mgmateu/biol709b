@@ -1,0 +1,100 @@
+---
+title: "MGM_update"
+output: html_document
+---
+
+## Root morphology and DSE colonization anlaysis
+
+###Lateral root length
+```{r, warning=FALSE, message=FALSE}
+library(plyr)
+library(ggplot2)
+root.length=read.csv('~/Desktop/BIOL709B class/Project_ITS/lat.root.length.csv')
+
+anova.rl=aov((root.length$lat.root.length ~ root.length$site + root.length$lineage + root.length$lineage*root.length$site))
+
+summary(anova.rl)
+
+TukeyHSD(anova.rl, "root.length$lineage", ordered=T)
+
+datasumm.rl<-ddply(root.length,c("lineage","site"),summarise, meanrl=mean(lat.root.length),
+sd=sd(lat.root.length),n=sum(!is.na(lat.root.length)), se=sd/sqrt(n))
+
+legend_title<-'Lineage'
+
+ggplot(data=datasumm.rl, aes(x=site, y=meanrl, fill=lineage))+geom_bar(stat='identity', position='dodge')+scale_fill_manual(legend_title, values=c("#CC6666", "#9999CC"))+geom_errorbar(aes(ymin=meanrl-se, ymax=meanrl+se), position=position_dodge(0.9), width=.2)+theme_light()+ylab('Lateral root length')+xlab('Site')
+```
+
+###Root hair density
+```{r, warning=FALSE, message=FALSE}
+root.hair=read.csv('~/Desktop/BIOL709B class/Project_ITS/root.hair.density.csv')
+
+anova.rh=aov((root.hair$root.hair.density ~ root.hair$site + root.hair$lineage + root.hair$lineage*root.hair$site))
+
+summary(anova.rh)
+```
+
+##<span style="color:red">**I can't get Tukey to run the interaction term. I used the same code as before for TukeyHSD (but using the interaction term) and it's not working **</span>
+
+
+```{r, warning=FALSE, message=FALSE}
+datasummrh<-ddply(root.hair,c("lineage","site"),summarise, meanrh=mean(root.hair.density),sd=sd(root.hair.density),n=sum(!is.na(root.hair.density)), se=sd/sqrt(n))
+
+ggplot(data=datasummrh, aes(x=site, y=meanrh, fill=lineage))+geom_bar(stat='identity', position='dodge')+scale_fill_manual(legend_title, values=c("#CC6666", "#9999CC"))+geom_errorbar(aes(ymin=meanrh-se, ymax=meanrh+se), position=position_dodge(0.9), width=.2)+theme_light()+ylab('Root hair density')+xlab('Site')
+
+```
+
+
+###Lateral root density
+```{r, warning=FALSE, message=FALSE}
+
+lat.root.density<-read.csv('/Users/Martina/Desktop/BIOL709B class/Project_ITS/lat.root.density.csv')
+
+anova.lrd=aov((lat.root.density$lat.root.density ~ lat.root.density$site + lat.root.density$lineage + lat.root.density$lineage*lat.root.density$site))
+
+summary(anova.lrd)
+
+datasummlrd<-ddply(lat.root.density,c("lineage","site"),summarise, meanlrd=mean(lat.root.density),sd=sd(lat.root.density),n=sum(!is.na(lat.root.density)), se=sd/sqrt(n))
+
+ggplot(data=datasummlrd, aes(x=site, y=meanlrd, fill=lineage))+geom_bar(stat='identity', position='dodge')+scale_fill_manual(legend_title, values=c("#CC6666", "#9999CC"))+geom_errorbar(aes(ymin=meanlrd-se, ymax=meanlrd+se), position=position_dodge(0.9), width=.2)+theme_light()+ylab('Lateral root density')+xlab('Site')
+```
+
+
+##Hydrology and DSE colonization
+
+#### I had data loggers in the field for 3 months that recorded water level every 5 minutes. The wetlands are tidal so there were daily fluctuation in water level and to try to make sense of this data I looked at how often the water level was at or above the soil surface and calculated a %Inundation based on that. Theory would suggest that an longer inundation periods should decrease fungal colonization due to possible oxygen restrictions to aerobic fungi. I'm not a hydrologist and I'm not sure what the best way to look at this is, but this is a first try to understand the data and what it means...
+```{r, warning=FALSE, message=FALSE}
+dse.water<-read.csv('/Users/Martina/Desktop/Projects/Summer 2017 /DSE col/Updated logger data/Water level and colonization/DSEwater.csv')
+
+date.dse<-as.Date(dse.water$Date,format="%m/%d/%y")
+
+ggplot(dse.water,aes(x=X.Inundation, y=Percent.Colonization, colour=Lineage))+geom_point()+geom_smooth(method='lm')+scale_color_manual(legend_title, values=c("#CC6666", "#9999CC"))+theme_light()+ylab('% Colonization')+xlab('Inundation (%time)')
+```
+
+
+##Try to fit environmental variables to NMDS
+```{r, warning=FALSE, message=FALSE}
+library(phyloseq)
+
+its<-import_biom('/Users/Martina/Desktop/BIOL709B class/Project_ITS/OTU_biom_ITS/otu_table_mcw_w_env_metadata_and_tax.biom')
+
+ #Rarefy data
+ its_rare = rarefy_even_depth(its, rngseed=TRUE)      
+
+#Make ordination, tried two options 
+its_rare_bray <- phyloseq::distance(its_rare, method = "bray")
+its_ord<-ordinate(its_rare, "NMDS", distance='bray')
+
+#Make a data frame from the sample data
+df_its <- data.frame(sample_data(its_rare))
+
+#Select a subset of variables from data frame
+subset.env<-df_its[c('ph','salinity')]
+
+library(vegan)
+library(ggplot2)
+plot_ordination(its_rare, ordinate(its_rare, "NMDS", distance='bray'), color = "Site", shape="Lineage") + geom_point(size = 3)
+ef<-envfit(its_ord, subset.env, permu=999)
+```
+##<span style="color:red">**I can't get the envfit to work propoerly because it is considering that my ph and salinity data are character variables. I couldn't figure out how to change that and I can't plot it for some reason when I use plot(ef). I was also trying to figure out if I could get this NMS graph to look like the one I made using the phyloseq package (shown above) but couldn't get that to work either. **</span>
+```
