@@ -4,6 +4,8 @@ output: html_document
 ---
 ###I'm trying to make a phylogenetic tree at the Order level, and that will also show the abundance of each order of fungal endophytes for native and invasive Phragmites. I have a separate file with the tree that I merged into the Phyloseq file that has the taxonomy, sample data and OTU table. The issue I'm having is that I can't get the tree to show the right taxonomic name, only the label based on the OTU table. Here are my codes and the files are on Github:
 
+###Hi Martina, the all_samples_file in your directory doesn't seem to have anything in it when I try to download it. I can get the OTU table though.
+
 ```{r, warning=FALSE, message=FALSE}
 library(phyloseq)
 library(ape)
